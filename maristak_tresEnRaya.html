@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tres en Raya — Maristak</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Georgia', serif;
+    }
+    #game {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 2rem; gap: 1rem;
+      background: #f2ead8; border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    h1 { color: #2a3d2a; font-size: 1.3rem; letter-spacing: 2px; text-transform: uppercase; }
+    #status {
+      background: #2a3d2a; color: #f0e8d0;
+      padding: 8px 24px; border-radius: 20px;
+      font-size: 14px; min-width: 280px; text-align: center;
+    }
+    #difficulty {
+      display: flex; gap: 8px; align-items: center;
+      font-size: 12px; color: #5a4a2a;
+    }
+    #difficulty button {
+      padding: 4px 14px; border-radius: 12px;
+      border: 1.5px solid #c8b99a;
+      background: #fffde7; cursor: pointer;
+      font-size: 12px; font-family: 'Georgia', serif;
+      transition: all 0.15s;
+    }
+    #difficulty button.active { background: #2a3d2a; color: #fff; border-color: #2a3d2a; }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 6px;
+    }
+    .cell {
+      width: 110px; height: 110px;
+      background: #fffde7;
+      border: 2px solid #c8b99a;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3.2rem; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .cell:hover:not(.taken) { background: #fff9c4; transform: scale(1.05); }
+    .cell.taken { cursor: default; }
+    .cell.win { background: #c8e6c9; border-color: #2a3d2a; animation: pulse 0.4s ease; }
+    .cell.lose { background: #ffcdd2; border-color: #c0392b; }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    #scores {
+      display: flex; gap: 1rem; font-size: 13px; color: #5a4a2a;
+    }
+    #scores span {
+      background: #e8dcc8; padding: 5px 16px; border-radius: 12px;
+    }
+    #scores b { color: #2a3d2a; font-size: 17px; }
+    #btn-reset {
+      background: #2a3d2a; color: #f0e8d0;
+      border: none; border-radius: 20px;
+      padding: 10px 28px; font-size: 14px;
+      font-family: 'Georgia', serif;
+      cursor: pointer; letter-spacing: 1px;
+      transition: background 0.2s;
+    }
+    #btn-reset:hover { background: #3d5c3d; }
+    footer {
+      margin-top: 1.5rem; color: #444; font-size: 11px;
+      font-family: 'Georgia', serif;
+    }
+  </style>
+</head>
+<body>
+
+<div id="game">
+  <h1>⛪ Tres en Raya · Maristak</h1>
+  <div id="difficulty">
+    <span>Dificultad:</span>
+    <button id="d-easy" onclick="setDiff('easy')">Fácil</button>
+    <button id="d-hard" class="active" onclick="setDiff('hard')">Difícil</button>
+  </div>
+  <div id="status">¡Tú empiezas! Eres el 📚</div>
+  <div id="board"></div>
+  <div id="scores">
+    <span>📚 Tú: <b id="s-human">0</b></span>
+    <span>🎓 Profe: <b id="s-ai">0</b></span>
+    <span>🤝 Empates: <b id="s-draw">0</b></span>
+  </div>
+  <button id="btn-reset" onclick="resetGame()">Nueva partida</button>
+</div>
+<footer>Maristak Ikastetxea — ¡Demuestra que eres mejor que el profe!</footer>
+
+<script>
+  const HUMAN = '📚', AI = '🎓';
+  const WIN_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  let board, gameOver, difficulty = 'hard';
+  let scores = { human: 0, ai: 0, draw: 0 };
+
+  function setDiff(d) {
+    difficulty = d;
+    document.getElementById('d-easy').classList.toggle('active', d === 'easy');
+    document.getElementById('d-hard').classList.toggle('active', d === 'hard');
+    resetGame();
+  }
+
+  function resetGame() {
+    board = Array(9).fill(null);
+    gameOver = false;
+    renderBoard();
+    setStatus('¡Tú empiezas! Eres el 📚');
+  }
+
+  function renderBoard(winLine, loserLine) {
+    const b = document.getElementById('board');
+    b.innerHTML = '';
+    board.forEach((v, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (v ? ' taken' : '');
+      if (winLine && winLine.includes(i)) cell.classList.add('win');
+      if (loserLine && loserLine.includes(i)) cell.classList.add('lose');
+      cell.textContent = v || '';
+      if (!v && !gameOver) cell.onclick = () => humanMove(i);
+      b.appendChild(cell);
+    });
+  }
+
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  function humanMove(i) {
+    if (board[i] || gameOver) return;
+    board[i] = HUMAN;
+    const w = checkWin(HUMAN);
+    if (w) { endGame('win', w); return; }
+    if (board.every(Boolean)) { endGame('draw'); return; }
+    renderBoard();
+    setStatus('Pensando el profe... 🤔');
+    setTimeout(aiMove, 450);
+  }
+
+  function aiMove() {
+    let idx;
+    if (difficulty === 'easy') {
+      if (Math.random() < 0.4) {
+        idx = bestMove();
+      } else {
+        const empty = board.map((v,i) => v ? null : i).filter(v => v !== null);
+        idx = empty[Math.floor(Math.random() * empty.length)];
+      }
+    } else {
+      idx = bestMove();
+    }
+    board[idx] = AI;
+    const w = checkWin(AI);
+    if (w) { endGame('lose', w); return; }
+    if (board.every(Boolean)) { endGame('draw'); return; }
+    renderBoard();
+    setStatus('Tu turno — eres el 📚');
+  }
+
+  function checkWin(player) {
+    for (const line of WIN_LINES) {
+      if (line.every(i => board[i] === player)) return line;
+    }
+    return null;
+  }
+
+  function endGame(result, line) {
+    gameOver = true;
+    if (result === 'win') {
+      scores.human++;
+      document.getElementById('s-human').textContent = scores.human;
+      renderBoard(line, null);
+      setStatus('🎉 ¡Ganaste! El profe está impresionado');
+    } else if (result === 'lose') {
+      scores.ai++;
+      document.getElementById('s-ai').textContent = scores.ai;
+      renderBoard(null, line);
+      setStatus('😅 El profe gana — ¡a estudiar más!');
+    } else {
+      scores.draw++;
+      document.getElementById('s-draw').textContent = scores.draw;
+      renderBoard();
+      setStatus('🤝 Empate — ¡buena partida!');
+    }
+  }
+
+  function bestMove() {
+    let best = -Infinity, idx = -1;
+    board.forEach((v, i) => {
+      if (!v) {
+        board[i] = AI;
+        const score = minimax(board, 0, false);
+        board[i] = null;
+        if (score > best) { best = score; idx = i; }
+      }
+    });
+    return idx;
+  }
+
+  function minimax(b, depth, isMax) {
+    if (checkWin(AI)) return 10 - depth;
+    if (checkWin(HUMAN)) return depth - 10;
+    if (b.every(Boolean)) return 0;
+    if (isMax) {
+      let best = -Infinity;
+      b.forEach((v, i) => { if (!v) { b[i] = AI; best = Math.max(best, minimax(b, depth+1, false)); b[i] = null; } });
+      return best;
+    } else {
+      let best = Infinity;
+      b.forEach((v, i) => { if (!v) { b[i] = HUMAN; best = Math.min(best, minimax(b, depth+1, true)); b[i] = null; } });
+      return best;
+    }
+  }
+
+  resetGame();
+</script>
+
+</body>
+</html>
